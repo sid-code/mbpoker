@@ -78,7 +78,7 @@ class MarkovNetworkPlayer(BasePokerPlayer):
             last_action_amount = 0
 
         hand_strength_estimate = estimate_hole_card_win_rate(
-            nb_simulation=1000,
+            nb_simulation=100,
             nb_player=len(round_state['seats']),
             hole_card=gen_cards(hole_card),
             community_card=gen_cards(round_state['community_card']))
