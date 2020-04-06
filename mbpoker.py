@@ -102,21 +102,24 @@ class MarkovNetworkPlayer(BasePokerPlayer):
 
         output_bit_0 = output_states[0]
         output_bit_1 = output_states[1]
-        output_raise_amount = to_number(output_states[3:])
+        output_raise_amount = to_number(output_states[2:4])
 
-        print(output_states)
         if output_bit_0 and output_bit_1:
-            
-            min_raise = valid_actions[2]['amount']['min']
-            max_raise = valid_actions[2]['amount']['max']
-            # 100 is arbitrary here
-            real_raise_amount = max(output_raise_amount / 100, 1) \
-                * (max_raise - min_raise) + min_raise
-            return 'raise', real_raise_amount
+            return 'fold', 0
         elif output_bit_0:
-            return 'call', valid_actions[1]['amount']
+            if output_raise_amount == 0:
+                # min raise
+                real_raise_amount = valid_actions[2]['amount']['min']
+            elif output_raise_amount == 1:
+                real_raise_amount = int(pot_size/4)
+            elif output_raise_amount == 2:
+                real_raise_amount = int(pot_size/2)
+            elif output_raise_amount == 3:
+                real_raise_amount = int(pot_size)
+
+            return 'raise', real_raise_amount
         else:
-            return 'fold', valid_actions[0]['amount']
+            return 'call', valid_actions[1]['amount']
 
     def receive_game_start_message(self, game_info):
         self.nb_player = game_info['player_num']
@@ -134,15 +137,15 @@ class MarkovNetworkPlayer(BasePokerPlayer):
         pass
 
 def play_poker(genome_1, genome_2, verbose=0):
-    net_1 = MarkovNetwork(num_input_states=81,
-                          num_memory_states=4,
-                          num_output_states=12,
+    net_1 = MarkovNetwork(num_input_states=76,
+                          num_memory_states=30,
+                          num_output_states=4,
                           genome=genome_1,
                           probabilistic=False)
 
-    net_2 = MarkovNetwork(num_input_states=81,
-                          num_memory_states=4,
-                          num_output_states=12,
+    net_2 = MarkovNetwork(num_input_states=76,
+                          num_memory_states=30,
+                          num_output_states=4,
                           genome=genome_2,
                           probabilistic=False)
 
