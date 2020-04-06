@@ -70,9 +70,9 @@ def get_next_generation(population):
         print("Pitting %s against %s, winner %s" % (i1, i2, winner))
         winners.append(winner)
 
-    # Now we have our list of winners who will get to reproduce The
+    # Now we have our list of winners who will get to reproduce. The
     # new individuals will be pushed to the front of the population
-    # and the populatioon will be trimmed to match its original size
+    # and the population will be trimmed to match its original size
 
     for _ in range(mutation_count):
         p = np.random.choice(winners)
