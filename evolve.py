@@ -86,7 +86,7 @@ def get_next_generation(population):
         child = p1.dup().cross_with(p2)
         next_generation.insert(0, child)
 
-    return next_generation[:pop_size-1]
+    return next_generation[:pop_size]
 
 if __name__ == '__main__':
     gen_count = 10
