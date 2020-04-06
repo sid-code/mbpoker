@@ -61,7 +61,10 @@ class MarkovNetworkPlayer(BasePokerPlayer):
             ccs.append( [0, 0, 0,  0, 0, 0, 0] )
 
         last_action = get_last_action(round_state)
-        if last_action['action'] == 'FOLD':
+        if last_action is None:
+            last_action_type = 0
+            last_action_amount = 0
+        elif last_action['action'] == 'FOLD':
             last_action_type = 1
             last_action_amount = 0
         elif last_action['action'] == 'CALL':
