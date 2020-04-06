@@ -83,15 +83,15 @@ class MarkovNetworkPlayer(BasePokerPlayer):
             hole_card=gen_cards(hole_card),
             community_card=gen_cards(round_state['community_card']))
 
-        # 1024 is arbitrary here
-        hand_strength = int(hand_strength_estimate * (2**10))
+        # 32 is arbitrary here
+        hand_strength = int(hand_strength_estimate * (2**5))
 
         pot_size = round_state['pot']['main']['amount']
 
         input_vec = sum(hcs, []) + sum(ccs, []) \
             + to_binary_digits(last_action_type, 2) \
             + to_binary_digits(last_action_amount, 10) \
-            + to_binary_digits(hand_strength, 10) \
+            + to_binary_digits(hand_strength, 5) \
             + to_binary_digits(pot_size, 10)
 
         self.markov_network.update_input_states(input_vec)
