@@ -153,8 +153,8 @@ def play_poker(genome_1, genome_2, verbose=0):
                                initial_stack=100,
                                small_blind_amount=5)
 
-    game_config.register_player(name='mb player 1', algorithm=MarkovNetworkPlayer(net_1))
-    game_config.register_player(name='mb player 2', algorithm=MarkovNetworkPlayer(net_2))
+    game_config.register_player(name=1, algorithm=MarkovNetworkPlayer(net_1))
+    game_config.register_player(name=2, algorithm=MarkovNetworkPlayer(net_2))
 
     game_result = start_poker(game_config, verbose=verbose)
     return game_result
