@@ -1,16 +1,21 @@
-from mbpoker import play_poker
+from mbpoker import play_poker, make_seed_genome
+import pickle
+import multiprocessing
 import numpy as np
 import uuid # for naming individuals
 
 class Individual:
-    def __init__(self, genome):
+    def __init__(self, genome, generation=0):
         self.genome = genome
         self.name = uuid.uuid4()
+        self.generation = generation
+
     def __str__(self):
         return self.name.hex[:12]
 
     def dup(self):
-        return Individual(self.genome[:])
+        # the duplicate has generation zero
+        return Individual(self.genome[:], self.generation + 1)
 
     def mutate_point(self, count=1):
         # replace a random number in this genome with another random
@@ -29,17 +34,29 @@ class Individual:
 
 def make_initial_population(size=100, genome_size=15000):
     result = []
-    for __ in range(size):
-        result.append(Individual(np.random.randint(0, 255, genome_size)))
+    for _ in range(size):
+        # we use this function from mbpoker to make a random markov
+        # network because it's guaranteed to have gates
+        genome = make_seed_genome()
+        result.append(Individual(genome))
     return result
 
-def determine_better_individual(individual_1, individual_2, n_games=3):
-    """Return the better of `individual_1` and `individual_2`.
+def determine_better_individual(matchup, n_games=3, verbose=0):
+    """Return the best individual in `matchup` (list of individuals).
+
+    For now, there can only be 2 individuals in a matchup.
 
     The result will be determined by playing `n_games` games of poker
     and choosing the player who wins more games.
 
     """
+
+    # The reason matchup is passed in as a tuple is to make this
+    # multiprocessing-friendly.
+
+    assert len(matchup) == 2, 'I can only compare two individuals'
+    individual_1, individual_2 = matchup
+
     wins_1 = 0
     wins_2 = 0
     for _ in range(n_games):
@@ -51,24 +68,28 @@ def determine_better_individual(individual_1, individual_2, n_games=3):
             wins_2 += 1
 
     if wins_1 > wins_2:
-        return individual_1
+        winner = individual_1
     else:
-        return individual_2
+        winner = individual_2
 
-def get_next_generation(population):
-    winners = []
+    if verbose:
+        print('%s vs %s -> win: %s' % (individual_1, individual_2, winner))
+    return winner
+
+def get_next_generation(population, mutation_count, crossover_count):
     pop_size = len(population)
+
     next_generation = population[:]
 
-    mutation_count = 5
-    crossover_count = 5
+    pairings = []
 
+    pool = multiprocessing.Pool(multiprocessing.cpu_count())
     for _ in range(pop_size):
         i1 = np.random.choice(population)
         i2 = np.random.choice(population)
-        winner = determine_better_individual(i1, i2)
-        print("Pitting %s against %s, winner %s" % (i1, i2, winner))
-        winners.append(winner)
+        pairings.append( (i1, i2) )
+
+    winners = pool.map(determine_better_individual, pairings)
 
     # Now we have our list of winners who will get to reproduce. The
     # new individuals will be pushed to the front of the population
@@ -76,7 +97,7 @@ def get_next_generation(population):
 
     for _ in range(mutation_count):
         p = np.random.choice(winners)
-        child = winner.dup().mutate_point(count=10)
+        child = p.dup().mutate_point(count=10)
         next_generation.insert(0, child)
 
     for _ in range(crossover_count):
@@ -89,13 +110,18 @@ def get_next_generation(population):
     return next_generation[:pop_size]
 
 if __name__ == '__main__':
-    gen_count = 10
-    pop = make_initial_population(size=10, genome_size=10000)
+    gen_count = 50
+    pop = make_initial_population(size=100, genome_size=10000)
 
     # Run through some generations
     for i in range(gen_count):
-        print('generation %d: %s' % (i, ', '.join([ str(ind) for ind in pop])))
-        pop = get_next_generation(pop)
+        avg_generation = sum(x.generation for x in pop) / len(pop)
+        print('generation %d' % (i))
+        pop = get_next_generation(pop, mutation_count=30,
+                                  crossover_count=30)
+
+        with open('data/generation_%d.pickle' % i, 'wb') as f:
+            pickle.dump(pop, f)
 
     # Now let's simulate a game between the first two individuals
     play_poker(pop[0].genome, pop[1].genome, verbose=1)

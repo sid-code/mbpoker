@@ -78,13 +78,15 @@ class MarkovNetworkPlayer(BasePokerPlayer):
             last_action_amount = 0
 
         hand_strength_estimate = estimate_hole_card_win_rate(
-            nb_simulation=100,
+            nb_simulation=10,
             nb_player=len(round_state['seats']),
             hole_card=gen_cards(hole_card),
             community_card=gen_cards(round_state['community_card']))
 
         # 32 is arbitrary here
-        hand_strength = int(hand_strength_estimate * (2**5))
+        hand_strength = int(hand_strength_estimate * (2**5)) - 1
+        if hand_strength < 0:
+            hand_strength = 0
 
         pot_size = round_state['pot']['main']['amount']
 
@@ -98,28 +100,33 @@ class MarkovNetworkPlayer(BasePokerPlayer):
         self.markov_network.activate_network()
 
         output_states = self.markov_network.get_output_states()
-        possible_actions = []
 
-        output_bit_0 = output_states[0]
-        output_bit_1 = output_states[1]
-        output_raise_amount = to_number(output_states[2:4])
+        do_raise = output_states[0]
+        do_call = output_states[1]
+        do_fold = output_states[2]
+        raise_amount = to_number(output_states[3:5])
 
-        if output_bit_0 and output_bit_1:
-            return 'fold', 0
-        elif output_bit_0:
-            if output_raise_amount == 0:
+        if do_raise:
+            if raise_amount == 0:
                 # min raise
                 real_raise_amount = valid_actions[2]['amount']['min']
-            elif output_raise_amount == 1:
-                real_raise_amount = int(pot_size/4)
-            elif output_raise_amount == 2:
-                real_raise_amount = int(pot_size/2)
-            elif output_raise_amount == 3:
-                real_raise_amount = int(pot_size)
+            elif raise_amount == 1:
+                real_raise_amount = pot_size + int(pot_size/4)
+            elif raise_amount == 2:
+                real_raise_amount = pot_size + int(pot_size/2)
+            elif raise_amount == 3:
+                real_raise_amount = pot_size + int(pot_size)
+            else:
+                # all in (this shouldn't happen)
+                real_raise_amount = valid_actions[2]['amount']['max']
 
             return 'raise', real_raise_amount
-        else:
+        elif do_call:
             return 'call', valid_actions[1]['amount']
+        elif do_fold:
+            return 'fold', 0
+        else:
+            return 'fold', 0
 
     def receive_game_start_message(self, game_info):
         self.nb_player = game_info['player_num']
@@ -136,21 +143,30 @@ class MarkovNetworkPlayer(BasePokerPlayer):
     def receive_round_result_message(self, winners, hand_info, round_state):
         pass
 
+def make_seed_genome():
+    return MarkovNetwork(num_input_states=76,
+                         num_memory_states=30,
+                         num_output_states=5,
+                         random_genome_length=10000,
+                         seed_num_markov_gates=20,
+                         probabilistic=True).genome
+
+
 def play_poker(genome_1, genome_2, verbose=0):
     net_1 = MarkovNetwork(num_input_states=76,
                           num_memory_states=30,
-                          num_output_states=4,
+                          num_output_states=5,
                           genome=genome_1,
-                          probabilistic=False)
+                          probabilistic=True)
 
     net_2 = MarkovNetwork(num_input_states=76,
                           num_memory_states=30,
-                          num_output_states=4,
+                          num_output_states=5,
                           genome=genome_2,
-                          probabilistic=False)
+                          probabilistic=True)
 
-    game_config = setup_config(max_round=20,
-                               initial_stack=100,
+    game_config = setup_config(max_round=50,
+                               initial_stack=500,
                                small_blind_amount=5)
 
     game_config.register_player(name=1, algorithm=MarkovNetworkPlayer(net_1))
