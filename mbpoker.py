@@ -124,7 +124,11 @@ class MarkovNetworkPlayer(BasePokerPlayer):
         elif do_call:
             return 'call', valid_actions[1]['amount']
         elif do_fold:
-            return 'fold', 0
+            # Don't fold if check is possible
+            if valid_actions[1]['amount'] == 0:
+                return 'call', 0
+            else:
+                return 'fold', 0
         else:
             return 'fold', 0
 
