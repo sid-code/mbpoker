@@ -3,12 +3,17 @@ import pickle
 import multiprocessing
 import numpy as np
 import uuid # for naming individuals
+from log import logger
+from glicko2 import glicko2
 
-class Individual:
+class Individual(glicko2.Player):
     def __init__(self, genome, generation=0):
+        glicko2.Player.__init__(self)
+
         self.genome = genome
         self.name = uuid.uuid4()
         self.generation = generation
+        self.glicko2 = 0
 
     def __str__(self):
         return self.name.hex[:12]
@@ -37,11 +42,11 @@ def make_initial_population(size=100, genome_size=15000):
     for _ in range(size):
         # we use this function from mbpoker to make a random markov
         # network because it's guaranteed to have gates
-        genome = make_seed_genome()
+        genome = make_seed_genome(genome_size)
         result.append(Individual(genome))
     return result
 
-def determine_better_individual(matchup, n_games=3, verbose=0):
+def play_game(matchup, verbose=0):
     """Return the best individual in `matchup` (list of individuals).
 
     For now, there can only be 2 individuals in a matchup.
@@ -57,26 +62,12 @@ def determine_better_individual(matchup, n_games=3, verbose=0):
     assert len(matchup) == 2, 'I can only compare two individuals'
     individual_1, individual_2 = matchup
 
-    wins_1 = 0
-    wins_2 = 0
-    for _ in range(n_games):
-        result = play_poker(individual_1.genome, individual_2.genome)
-        better_player = max(result['players'], key=lambda x: x['stack'])['name']
-        if better_player == 1:
-            wins_1 += 1
-        else:
-            wins_2 += 1
+    result = play_poker(individual_1.genome, individual_2.genome)
+    better_player = max(result['players'], key=lambda x: x['stack'])['name']
+    return better_player
 
-    if wins_1 > wins_2:
-        winner = individual_1
-    else:
-        winner = individual_2
-
-    if verbose:
-        print('%s vs %s -> win: %s' % (individual_1, individual_2, winner))
-    return winner
-
-def get_next_generation(population, mutation_count, crossover_count):
+def get_next_generation(population, game_count, parent_count,
+                        mutation_count, crossover_count, verbose=0):
     pop_size = len(population)
 
     next_generation = population[:]
@@ -84,26 +75,62 @@ def get_next_generation(population, mutation_count, crossover_count):
     pairings = []
 
     pool = multiprocessing.Pool(multiprocessing.cpu_count())
-    for _ in range(pop_size):
+    for _ in range(game_count):
         i1 = np.random.choice(population)
         i2 = np.random.choice(population)
         pairings.append( (i1, i2) )
 
-    winners = pool.map(determine_better_individual, pairings)
+    logger.info("Pairings determined, playing games...")
+    results = pool.map(play_game, pairings)
+
+    logger.info("Updating ratings...")
+    for better_player, (p1, p2) in zip(results, pairings):
+        if better_player == 1:
+            winner, loser = p1, p2
+        else:
+            loser, winner = p1, p2
+
+        winner_old_rating = winner.getRating()
+        loser_old_rating = loser.getRating()
+
+        winner_old_rd = winner.getRd()
+        loser_old_rd = loser.getRd()
+
+        winner.update_player([ loser_old_rating ], [ loser_old_rd ], [ 1 ])
+        loser.update_player([ winner_old_rating ], [ winner_old_rd ], [ 0 ])
+
+        winner_new_rating = winner.getRating()
+        loser_new_rating = loser.getRating()
+
+        winner_new_rd = winner.getRd()
+        loser_new_rd = loser.getRd()
+
+        if verbose:
+            logger.debug('winner glicko2 %d +/- %d -> %d +/- %d' % (winner_old_rating, winner_old_rd,
+                                                             winner_new_rating, winner_new_rd))
+            logger.debug('loser glicko2 %d +/- %d -> %d +/- %d' % (loser_old_rating, loser_old_rd,
+                                                            loser_new_rating, loser_new_rd))
+    # Sort descending by glicko2
+    sorted_pop = sorted(population, key=lambda x: -x.getRating())
+    logger.info('highest 5 glicko2s: %s' % [ int(x.getRating()) for x in sorted_pop[:5] ])
+
+    # Trim down this list to size
+    parents = sorted_pop[:parent_count]
+
 
     # Now we have our list of winners who will get to reproduce. The
     # new individuals will be pushed to the front of the population
     # and the population will be trimmed to match its original size
 
     for _ in range(mutation_count):
-        p = np.random.choice(winners)
+        p = np.random.choice(parents)
         child = p.dup().mutate_point(count=10)
         next_generation.insert(0, child)
 
     for _ in range(crossover_count):
         # choose parents from winners
-        p1 = np.random.choice(winners)
-        p2 = np.random.choice(winners)
+        p1 = np.random.choice(parents)
+        p2 = np.random.choice(parents)
         child = p1.dup().cross_with(p2)
         next_generation.insert(0, child)
 
@@ -111,14 +138,19 @@ def get_next_generation(population, mutation_count, crossover_count):
 
 if __name__ == '__main__':
     gen_count = 50
-    pop = make_initial_population(size=100, genome_size=10000)
+    logger.info("Generating initial population")
+    pop = make_initial_population(size=100, genome_size=30000)
+
 
     # Run through some generations
     for i in range(gen_count):
         avg_generation = sum(x.generation for x in pop) / len(pop)
-        print('generation %d' % (i))
-        pop = get_next_generation(pop, mutation_count=30,
-                                  crossover_count=30)
+        logger.info('generation %d' % (i))
+        pop = get_next_generation(pop,
+                                  game_count=10000,
+                                  parent_count=10,
+                                  mutation_count=50,
+                                  crossover_count=50)
 
         with open('data/generation_%d.pickle' % i, 'wb') as f:
             pickle.dump(pop, f)
