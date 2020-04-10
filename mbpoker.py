@@ -147,24 +147,24 @@ class MarkovNetworkPlayer(BasePokerPlayer):
     def receive_round_result_message(self, winners, hand_info, round_state):
         pass
 
-def make_seed_genome():
+def make_seed_genome(genome_size):
     return MarkovNetwork(num_input_states=76,
-                         num_memory_states=30,
+                         num_memory_states=300,
                          num_output_states=5,
-                         random_genome_length=10000,
-                         seed_num_markov_gates=20,
+                         random_genome_length=genome_size,
+                         seed_num_markov_gates=100,
                          probabilistic=True).genome
 
 
 def play_poker(genome_1, genome_2, verbose=0):
     net_1 = MarkovNetwork(num_input_states=76,
-                          num_memory_states=30,
+                          num_memory_states=300,
                           num_output_states=5,
                           genome=genome_1,
                           probabilistic=True)
 
     net_2 = MarkovNetwork(num_input_states=76,
-                          num_memory_states=30,
+                          num_memory_states=300,
                           num_output_states=5,
                           genome=genome_2,
                           probabilistic=True)
