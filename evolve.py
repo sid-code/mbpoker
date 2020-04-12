@@ -137,7 +137,7 @@ def get_next_generation(population, game_count, parent_count,
 if __name__ == '__main__':
     gen_count = 50
     logger.info("Generating initial population")
-    pop = make_initial_population(size=100, genome_size=30000)
+    pop = make_initial_population(size=300, genome_size=30000)
 
 
     # Run through some generations
@@ -146,9 +146,9 @@ if __name__ == '__main__':
         logger.info('generation %d' % (i))
         pop = get_next_generation(pop,
                                   game_count=10000,
-                                  parent_count=10,
-                                  mutation_count=50,
-                                  crossover_count=50)
+                                  parent_count=30,
+                                  mutation_count=100,
+                                  crossover_count=100)
 
         with open('data/generation_%d.pickle' % i, 'wb') as f:
             pickle.dump(pop, f)
