@@ -1,4 +1,4 @@
-from mbpoker import play_poker, make_seed_genome
+import mbpoker
 import pickle
 import multiprocessing
 import numpy as np
@@ -11,6 +11,7 @@ class Individual(glicko2.Player):
         glicko2.Player.__init__(self)
 
         self.genome = genome
+        self.network = mbpoker.make_markov_network(genome)
         self.name = uuid.uuid4()
         self.generation = generation
         self.glicko2 = 0
@@ -37,12 +38,12 @@ class Individual(glicko2.Player):
         self.genome[crossover_point:] = other_individual.genome[crossover_point:]
         return self
 
-def make_initial_population(size=100, genome_size=15000):
+def make_initial_population(size=100, genome_size):
     result = []
     for _ in range(size):
         # we use this function from mbpoker to make a random markov
         # network because it's guaranteed to have gates
-        genome = make_seed_genome(genome_size)
+        genome = mbpoker.make_seed_genome(genome_size, seed_gates=400)
         result.append(Individual(genome))
     return result
 
@@ -62,7 +63,7 @@ def play_game(matchup, verbose=0):
     assert len(matchup) == 2, 'I can only compare two individuals'
     individual_1, individual_2 = matchup
 
-    result = play_poker(individual_1.genome, individual_2.genome)
+    result = mbpoker.play_poker(individual_1.network, individual_2.network)
     better_player = max(result['players'], key=lambda x: x['stack'])['name']
     return better_player
 

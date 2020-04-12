@@ -147,28 +147,23 @@ class MarkovNetworkPlayer(BasePokerPlayer):
     def receive_round_result_message(self, winners, hand_info, round_state):
         pass
 
-def make_seed_genome(genome_size):
+def make_seed_genome(genome_size, seed_gates):
     return MarkovNetwork(num_input_states=76,
                          num_memory_states=300,
                          num_output_states=5,
                          random_genome_length=genome_size,
-                         seed_num_markov_gates=100,
+                         seed_num_markov_gates=seed_gates,
                          probabilistic=True).genome
 
 
-def play_poker(genome_1, genome_2, verbose=0):
-    net_1 = MarkovNetwork(num_input_states=76,
-                          num_memory_states=300,
-                          num_output_states=5,
-                          genome=genome_1,
-                          probabilistic=True)
+def make_markov_network(genome):
+    return MarkovNetwork(num_input_states=76,
+                         num_memory_states=300,
+                         num_output_states=5,
+                         genome=genome,
+                         probabilistic=True)
 
-    net_2 = MarkovNetwork(num_input_states=76,
-                          num_memory_states=300,
-                          num_output_states=5,
-                          genome=genome_2,
-                          probabilistic=True)
-
+def play_poker(net_1, net_2, verbose=0):
     game_config = setup_config(max_round=50,
                                initial_stack=500,
                                small_blind_amount=5)
@@ -183,4 +178,6 @@ def play_poker(genome_1, genome_2, verbose=0):
 if __name__ == '__main__':
     genome_1 = np.random.randint(0, 256, 150000)
     genome_2 = np.random.randint(0, 256, 150000)
-    print(play_poker(genome_1, genome_2))
+    net_1 = make_markov_network(genome_1)
+    net_2 = make_markov_network(genome_2)
+    print(play_poker(net_1, net_2))
