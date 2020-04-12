@@ -38,7 +38,7 @@ class Individual(glicko2.Player):
         self.genome[crossover_point:] = other_individual.genome[crossover_point:]
         return self
 
-def make_initial_population(size=100, genome_size):
+def make_initial_population(size, genome_size):
     result = []
     for _ in range(size):
         # we use this function from mbpoker to make a random markov
