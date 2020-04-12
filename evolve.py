@@ -71,8 +71,6 @@ def get_next_generation(population, game_count, parent_count,
                         mutation_count, crossover_count, verbose=0):
     pop_size = len(population)
 
-    next_generation = population[:]
-
     pairings = []
 
     pool = multiprocessing.Pool(multiprocessing.cpu_count())
@@ -111,13 +109,12 @@ def get_next_generation(population, game_count, parent_count,
                                                              winner_new_rating, winner_new_rd))
             logger.debug('loser glicko2 %d +/- %d -> %d +/- %d' % (loser_old_rating, loser_old_rd,
                                                             loser_new_rating, loser_new_rd))
-    # Sort descending by glicko2
-    sorted_pop = sorted(population, key=lambda x: -x.getRating())
-    logger.info('highest 5 glicko2s: %s' % [ int(x.getRating()) for x in sorted_pop[:5] ])
+    # The initial next generation is this generation sorted by rating descending
+    next_generation = sorted(population, key=lambda x: -x.getRating())
+    logger.info('highest 5 glicko2s: %s' % [ int(x.getRating()) for x in next_generation[:5] ])
 
-    # Trim down this list to size
-    parents = sorted_pop[:parent_count]
-
+    # Select parents
+    parents = next_generation[:parent_count]
 
     # Now we have our list of winners who will get to reproduce. The
     # new individuals will be pushed to the front of the population
