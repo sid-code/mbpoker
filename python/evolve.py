@@ -38,12 +38,12 @@ class Individual(glicko2.Player):
         self.genome[crossover_point:] = other_individual.genome[crossover_point:]
         return self
 
-def make_initial_population(size, genome_size):
+def make_initial_population(size, genome_size, seed_gates):
     result = []
     for _ in range(size):
         # we use this function from mbpoker to make a random markov
         # network because it's guaranteed to have gates
-        genome = mbpoker.make_seed_genome(genome_size, seed_gates=400)
+        genome = mbpoker.make_seed_genome(genome_size, seed_gates=seed_gates)
         result.append(Individual(genome))
     return result
 
@@ -137,7 +137,7 @@ def get_next_generation(population, game_count, parent_count,
 if __name__ == '__main__':
     gen_count = 50
     logger.info("Generating initial population")
-    pop = make_initial_population(size=300, genome_size=30000)
+    pop = make_initial_population(size=300, genome_size=30000, seed_gates=300)
 
 
     # Run through some generations
@@ -148,7 +148,8 @@ if __name__ == '__main__':
                                   game_count=10000,
                                   parent_count=30,
                                   mutation_count=100,
-                                  crossover_count=100)
+                                  crossover_count=100,
+                                  verbose=1)
 
         with open('data/generation_%d.pickle' % i, 'wb') as f:
             pickle.dump(pop, f)
