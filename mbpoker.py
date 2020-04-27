@@ -1,11 +1,15 @@
 from MarkovNetwork import MarkovNetwork
 import numpy as np
 
+# poker engine
 import pypokerengine.utils.visualize_utils as U
 from pypokerengine.api.game import setup_config, start_poker
 from pypokerengine.players import BasePokerPlayer
 from pypokerengine.api.emulator import Emulator
 from pypokerengine.utils.card_utils import gen_cards, estimate_hole_card_win_rate
+
+# hand evaluation
+import treys
 
 def get_last_action(round_state):
     street = round_state['street']
@@ -27,6 +31,15 @@ def to_binary_digits(n, n_bits):
         i += 1
     return result
 
+def to_lubinary_digits(n, n_bits):
+    result = [0] * n_bits
+    i = 0
+    while n > 0 and i < n_bits:
+        result[i] = 1
+        n //= 2
+        i += 1
+    return result
+
 def to_number(bits):
     n = 0
     for i, bit in enumerate(bits):
@@ -36,8 +49,7 @@ def to_number(bits):
     return n
 
 def card_str_to_numbers(card_str):
-    suit = card_str[0]
-    value = card_str[1]
+    suit, value = card_str[0], card_str[1]
     suitnums = {'C': 1, 'S': 2, 'H': 3, 'D': 4} # 0 is reserved for "no card"
     valuenums = {'A': 1, 'T': 10, 'J': 11, 'Q': 12, 'K': 13}
     suitnum = suitnums[suit]
@@ -47,16 +59,23 @@ def card_str_to_numbers(card_str):
     else:
         valuenum = valuenums[value]
 
+    return suitnum, valuenum
+
+def card_str_to_binary(card_str):
+    suitnum, valuenum = card_str_to_numbers(card_str)
     return to_binary_digits(suitnum, 3) + to_binary_digits(valuenum, 4)
 
+def card_str_to_treys(card_str):
+    suit, value = card_str[0], card_str[1]
+    return value.upper() + suit.lower()
 
 class MarkovNetworkPlayer(BasePokerPlayer):
     def __init__(self, markov_network):
         self.markov_network = markov_network
 
     def declare_action(self, valid_actions, hole_card, round_state):
-        hcs = [ card_str_to_numbers(hc) for hc in hole_card ]
-        ccs = [ card_str_to_numbers(cc) for cc in round_state['community_card'] ]
+        hcs = [ card_str_to_binary(hc) for hc in hole_card ]
+        ccs = [ card_str_to_binary(cc) for cc in round_state['community_card'] ]
         while len(ccs) < 5: # pad it to 5 community cards
             ccs.append( [0, 0, 0,  0, 0, 0, 0] )
 
@@ -77,14 +96,23 @@ class MarkovNetworkPlayer(BasePokerPlayer):
             last_action_type = 0
             last_action_amount = 0
 
-        hand_strength_estimate = estimate_hole_card_win_rate(
-            nb_simulation=10,
-            nb_player=len(round_state['seats']),
-            hole_card=gen_cards(hole_card),
-            community_card=gen_cards(round_state['community_card']))
+        if len(round_state['community_card']) == 0:
+            hand_strength_estimate = 31
+
+        else:
+            hand = [ treys.Card.new(card_str_to_treys(c)) for c in hole_card ]
+            board = [ treys.Card.new(card_str_to_treys(c)) for c in round_state['community_card'] ]
+            ev = treys.Evaluator()
+            hand_strength_estimate = 1 - ev.evaluate(board, hand) / 7642
+
+        #hand_strength_estimate = estimate_hole_card_win_rate(
+        #    nb_simulation=100,
+        #    nb_player=len(round_state['seats']),
+        #    hole_card=gen_cards(hole_card),
+        #    community_card=gen_cards(round_state['community_card']))
 
         # 32 is arbitrary here
-        hand_strength = int(hand_strength_estimate * (2**5)) - 1
+        hand_strength = int(hand_strength_estimate * (2**5))
         if hand_strength < 0:
             hand_strength = 0
 
@@ -93,8 +121,8 @@ class MarkovNetworkPlayer(BasePokerPlayer):
         input_vec = sum(hcs, []) + sum(ccs, []) \
             + to_binary_digits(last_action_type, 2) \
             + to_binary_digits(last_action_amount, 10) \
-            + to_binary_digits(hand_strength, 5) \
-            + to_binary_digits(pot_size, 10)
+            + to_lubinary_digits(hand_strength, 5) \
+            + to_lubinary_digits(pot_size, 10)
 
         self.markov_network.update_input_states(input_vec)
         self.markov_network.activate_network()
@@ -123,14 +151,12 @@ class MarkovNetworkPlayer(BasePokerPlayer):
             return 'raise', real_raise_amount
         elif do_call:
             return 'call', valid_actions[1]['amount']
-        elif do_fold:
+        else:
             # Don't fold if check is possible
             if valid_actions[1]['amount'] == 0:
                 return 'call', 0
             else:
                 return 'fold', 0
-        else:
-            return 'fold', 0
 
     def receive_game_start_message(self, game_info):
         self.nb_player = game_info['player_num']
@@ -149,7 +175,7 @@ class MarkovNetworkPlayer(BasePokerPlayer):
 
 def make_seed_genome(genome_size, seed_gates):
     return MarkovNetwork(num_input_states=76,
-                         num_memory_states=300,
+                         num_memory_states=40,
                          num_output_states=5,
                          random_genome_length=genome_size,
                          seed_num_markov_gates=seed_gates,
@@ -158,7 +184,7 @@ def make_seed_genome(genome_size, seed_gates):
 
 def make_markov_network(genome):
     return MarkovNetwork(num_input_states=76,
-                         num_memory_states=300,
+                         num_memory_states=40,
                          num_output_states=5,
                          genome=genome,
                          probabilistic=True)
