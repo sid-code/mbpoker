@@ -100,22 +100,54 @@ def init_population(M):
     return [gen_mn(3,1) for _ in range(M)]
 
 
-def mutate(parents, p_m=.1):
+def mutate(parents, p_m=0.1, p_pm=0.1, p_cm=0.001):
     children = np.empty(parents.shape[0], dtype=object)
     for i, parent in enumerate(parents):
         seed_genome = parent.genome
+        gate_io_ranges, gate_pt_ranges = get_gate_ranges(seed_genome)
+        gate_pt_locs = np.hstack([ list(range(*r)) for r in gate_pt_ranges ])
+        gate_io_locs = np.hstack([ list(range(*r)) for r in gate_io_ranges ])
 
         # Modify the seed genome with some probability in each loci
         idx = np.random.choice([False, True], size=seed_genome.shape[0], p=[1 - p_m, p_m])
+
+        # Only take positions from gate_pt_locs
+        pt_idxs = np.random.choice([False, True], size=gate_pt_locs.shape[0], p=[1 - p_pm, p_pm])
+        # Only take positions from gate_io_locs
+        io_idxs = np.random.choice([False, True], size=gate_io_locs.shape[0], p=[1 - p_cm, p_cm])
+
+        pt_idx = gate_pt_locs[pt_idxs]
+        io_idx = gate_io_locs[io_idxs]
+
         seed_genome[idx] = np.random.randint(256, size=seed_genome[idx].shape)
-        mn = MarkovNetwork(num_input_states=3,
-                           num_memory_states=1,
-                           num_output_states=1,
+        seed_genome[pt_idx] = np.random.randint(256, size=pt_idx.shape)
+        seed_genome[io_idx] = np.random.randint(256, size=io_idx.shape)
+        mn = MarkovNetwork(num_input_states=parent.num_input_states,
+                           num_output_states=parent.num_output_states,
+                           num_memory_states=parent.num_memory_states,
                            probabilistic=True,
                            genome=seed_genome)
         children[i] = mn
     return children
 
+def get_gate_ranges(genome):
+    ios = [] # input/output wirings
+    pts = [] # probability tables
+    for i in range(len(genome) - 1):
+        if genome[i] == 42 and genome[i+1] == 213:
+            i2 = i + 2
+            num_inputs = (genome[i2] % MarkovNetwork.max_markov_gate_inputs) + 1
+            i2 += 1
+            num_outputs = (genome[i2] % MarkovNetwork.max_markov_gate_outputs) + 1
+            i2 += 1
+            io_range_size = MarkovNetwork.max_markov_gate_inputs \
+                + MarkovNetwork.max_markov_gate_outputs
+            ios.append( (i2, i2 + io_range_size) )
+            i2 += io_range_size
+            pt_range_size = (2**num_inputs) * (2**num_outputs)
+            pts.append( (i2, i2 + pt_range_size) )
+
+    return ios, pts
 
 def visualize(trace, filename):
     plt.plot(np.arange(100), np.array(trace))
