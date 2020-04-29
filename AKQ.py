@@ -105,8 +105,14 @@ def mutate(parents, p_m=0.1, p_pm=0.1, p_cm=0.001):
     for i, parent in enumerate(parents):
         seed_genome = parent.genome
         gate_io_ranges, gate_pt_ranges = get_gate_ranges(seed_genome)
-        gate_pt_locs = np.hstack([ list(range(*r)) for r in gate_pt_ranges ])
-        gate_io_locs = np.hstack([ list(range(*r)) for r in gate_io_ranges ])
+        if len(gate_pt_ranges) == 0:
+            gate_pt_locs = np.array([], dtype=int)
+        else:
+            gate_pt_locs = np.hstack([ list(range(*r)) for r in gate_pt_ranges ])
+        if len(gate_io_ranges) == 0:
+            gate_io_locs = np.array([], dtype=int)
+        else:
+            gate_io_locs = np.hstack([ list(range(*r)) for r in gate_io_ranges ])
 
         # Modify the seed genome with some probability in each loci
         idx = np.random.choice([False, True], size=seed_genome.shape[0], p=[1 - p_m, p_m])
