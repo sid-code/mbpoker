@@ -1,4 +1,4 @@
 MarkovNetwork==1.3
-numpy==1.18.2
+numpy==1.22.0
 PyPokerEngine==1.0.1
 glicko2
